@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADB Developer Studio</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">ADB Studio</span>
+          <span class="brand-badge">PRO DEV</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="devices">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          <span>Connect Devices</span>
+        </button>
+        
+        <button class="nav-item" data-tab="projects">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          <span>Dev Projects & APKs</span>
+        </button>
+        
+        <button class="nav-item" data-tab="screenshot">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>Screenshot & Rec</span>
+        </button>
+        
+        <button class="nav-item" data-tab="logcat">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>Live Logcat Stream</span>
+        </button>
+        
+        <button class="nav-item" data-tab="appmgr">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>App Actions & Intents</span>
+        </button>
+        
+        <button class="nav-item" data-tab="uitoggles">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>UI Testing Toggles</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="active-device-card" id="active-device-card">
+          <div class="status-pulse offline" id="status-pulse"></div>
+          <div class="device-details">
+            <span class="device-name" id="selected-device-name">No Device</span>
+            <span class="device-sub" id="selected-device-sub">Select Target</span>
+          </div>
+          <button class="icon-btn-sm" id="btn-refresh-devices" title="Refresh ADB Devices">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Bar / Header -->
+      <header class="topbar">
+        <div class="target-selector">
+          <label for="device-select" class="selector-label">TARGET DEVICE:</label>
+          <div class="select-wrapper">
+            <select id="device-select">
+              <option value="">Scanning devices...</option>
+            </select>
+            <svg class="select-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-quick-screenshot" title="Take Instant Screenshot">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span>Screenshot</span>
+          </button>
+
+          <button class="btn btn-outline btn-sm" id="btn-open-screenshots-folder" title="Open Saved Folder">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Folder</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Tab Content Views -->
+      <div class="tab-views">
+        
+        <!-- 1. DEVICES TAB -->
+        <section class="tab-view active" id="tab-devices">
+          <div class="view-header">
+            <div>
+              <h2>ADB Device Manager</h2>
+              <p class="view-desc">Connect via USB or Wireless Debugging with saved recent device reconnect.</p>
+            </div>
+          </div>
+
+          <div class="grid-2col">
+            <!-- Connect Card -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <h3>⚡ Wireless Connection</h3>
+                <span class="badge">Port Default: 5555</span>
+              </div>
+              <div class="card-body">
+                <div class="form-row">
+                  <div class="form-group flex-2">
+                    <label>IP Address</label>
+                    <input type="text" id="input-ip" placeholder="e.g. 192.168.1.100" autocomplete="off">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>Port</label>
+                    <input type="text" id="input-port" value="5555" placeholder="5555">
+                  </div>
+                </div>
+                
+                <div class="form-actions">
+                  <button class="btn btn-primary" id="btn-connect-wireless">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    <span>Connect Wireless</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Wireless Pair Card (Android 11+) -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <h3>🔑 Wireless Pairing (Android 11+)</h3>
+                <span class="badge badge-indigo">Pair Code</span>
+              </div>
+              <div class="card-body">
+                <div class="form-row">
+                  <div class="form-group flex-2">
+                    <label>Pairing IP:Port</label>
+                    <input type="text" id="input-pair-target" placeholder="192.168.1.100:37123">
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>6-Digit Code</label>
+                    <input type="text" id="input-pair-code" placeholder="123456">
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button class="btn btn-secondary" id="btn-pair-wireless">
+                    <span>Pair Device</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Devices Card -->
+          <div class="card glass-card margin-top">
+            <div class="card-header">
+              <h3>🕒 Recent & Paired Devices</h3>
+              <span class="subtext">Click card to instantly reconnect. Change port inline if dynamic port updated.</span>
+            </div>
+            <div class="card-body">
+              <div class="recent-devices-grid" id="recent-devices-list">
+                <div class="empty-state">No recent devices saved yet.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. DEV PROJECTS TAB -->
+        <section class="tab-view" id="tab-projects">
+          <div class="view-header">
+            <div>
+              <h2>Dev Projects & Built APK Watcher</h2>
+              <p class="view-desc">Add your Android Studio, Flutter, or React Native project folder to auto-detect build APKs and install with 1-click.</p>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-add-project">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Add Project Folder</span>
+            </button>
+          </div>
+
+          <!-- Drag and Drop APK Zone -->
+          <div class="drop-zone" id="apk-drop-zone">
+            <div class="drop-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="drop-text">
+              <strong>Drag & Drop any .APK file here</strong>
+              <span>or <button class="link-btn" id="btn-browse-apk">browse file</button> to install immediately on target device</span>
+            </div>
+          </div>
+
+          <div class="projects-container" id="projects-container">
+            <!-- Project Cards Rendered via JS -->
+          </div>
+        </section>
+
+        <!-- 3. SCREENSHOT & RECORDING TAB -->
+        <section class="tab-view" id="tab-screenshot">
+          <div class="view-header">
+            <div>
+              <h2>Screenshot & Screen Recorder</h2>
+              <p class="view-desc">Capture ultra-fast full-resolution screenshots, copy direct to clipboard, or record MP4 screen videos.</p>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-primary" id="btn-take-screenshot-main">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>Take Screenshot</span>
+              </button>
+              
+              <button class="btn btn-secondary" id="btn-record-screen">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+                <span>Record Screen (15s)</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="screenshot-layout">
+            <!-- Preview Display -->
+            <div class="card glass-card preview-card">
+              <div class="preview-header">
+                <span class="preview-title">LATEST CAPTURE PREVIEW</span>
+                <button class="btn btn-emerald btn-sm" id="btn-copy-clipboard" disabled>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span>Copy Image to Clipboard</span>
+                </button>
+              </div>
+              <div class="preview-body" id="screenshot-preview-container">
+                <div class="preview-placeholder">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <p>Click "Take Screenshot" to capture current device screen</p>
+                </div>
+                <img id="screenshot-img" class="screenshot-img hidden" alt="Device Screenshot">
+              </div>
+              <div class="preview-footer" id="screenshot-footer-info">
+                <span>Save Directory: <code id="lbl-screenshot-dir">--</code></span>
+                <button class="link-btn-sm" id="btn-change-save-dir">Change Folder</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. LOGCAT STREAM TAB -->
+        <section class="tab-view" id="tab-logcat">
+          <div class="view-header">
+            <div>
+              <h2>Live Logcat Console</h2>
+              <p class="view-desc">Stream and filter android system logcat messages in real time.</p>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-secondary btn-sm" id="btn-toggle-logcat">
+                <span id="lbl-logcat-toggle">Start Stream</span>
+              </button>
+              <button class="btn btn-outline btn-sm" id="btn-clear-logcat">Clear</button>
+            </div>
+          </div>
+
+          <div class="card glass-card logcat-card">
+            <div class="logcat-controls">
+              <div class="form-group flex-2">
+                <input type="text" id="logcat-search" placeholder="Search logs (e.g. tag, error message)..." class="input-sm">
+              </div>
+              <div class="form-group flex-1">
+                <select id="logcat-level" class="select-sm">
+                  <option value="V">Verbose (V)</option>
+                  <option value="D">Debug (D)</option>
+                  <option value="I">Info (I)</option>
+                  <option value="W" selected>Warning (W)</option>
+                  <option value="E">Error (E)</option>
+                  <option value="F">Fatal (F)</option>
+                </select>
+              </div>
+            </div>
+            <div class="logcat-terminal" id="logcat-terminal">
+              <div class="log-line info">-- Logcat console ready. Click "Start Stream" to view device logs. --</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. APP ACTIONS & INTENTS TAB -->
+        <section class="tab-view" id="tab-appmgr">
+          <div class="view-header">
+            <div>
+              <h2>App Actions & Deep Link Tester</h2>
+              <p class="view-desc">Clear app data, force stop, grant permissions, or launch custom deep link URIs.</p>
+            </div>
+            <button class="btn btn-outline btn-sm" id="btn-refresh-apps">Refresh App List</button>
+          </div>
+
+          <div class="grid-2col">
+            <!-- App Quick Actions -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <h3>⚡ Package Shortcuts</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label>Installed User Packages</label>
+                  <select id="app-package-select">
+                    <option value="">Select Package...</option>
+                  </select>
+                </div>
+                <div class="form-group margin-top-sm">
+                  <label>Or type Package Name</label>
+                  <input type="text" id="input-custom-package" placeholder="com.example.myapp">
+                </div>
+
+                <div class="action-buttons-grid margin-top">
+                  <button class="btn btn-warning btn-sm" id="btn-app-clear">
+                    <span>🧹 Clear Data</span>
+                  </button>
+                  <button class="btn btn-secondary btn-sm" id="btn-app-stop">
+                    <span>🛑 Force Stop</span>
+                  </button>
+                  <button class="btn btn-emerald btn-sm" id="btn-app-grant">
+                    <span>🔑 Grant Perms</span>
+                  </button>
+                  <button class="btn btn-danger btn-sm" id="btn-app-uninstall">
+                    <span>🗑️ Uninstall</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Deep Link Tester -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <h3>🔗 Deep Link & Intent Launcher</h3>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label>Target URI / Custom Scheme</label>
+                  <input type="text" id="input-deeplink-uri" placeholder="e.g. myapp://profile?user_id=1024 or https://...">
+                </div>
+                <div class="form-actions margin-top">
+                  <button class="btn btn-primary" id="btn-launch-deeplink">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    <span>Trigger Intent / Deep Link</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. UI TOGGLES & HARDWARE STATS TAB -->
+        <section class="tab-view" id="tab-uitoggles">
+          <div class="view-header">
+            <div>
+              <h2>UI Testing Toggles & Diagnostics</h2>
+              <p class="view-desc">Inspect layout bounds, touchpoints, display density, and live battery & hardware stats.</p>
+            </div>
+          </div>
+
+          <div class="grid-2col">
+            <!-- Hardware Stats -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <h3>📱 Device Hardware Diagnostics</h3>
+              </div>
+              <div class="card-body">
+                <div class="stats-grid">
+                  <div class="stat-box">
+                    <span class="stat-label">MODEL</span>
+                    <span class="stat-value" id="stat-model">--</span>
+                  </div>
+                  <div class="stat-box">
+                    <span class="stat-label">ANDROID OS</span>
+                    <span class="stat-value" id="stat-android">--</span>
+                  </div>
+                  <div class="stat-box">
+                    <span class="stat-label">BATTERY</span>
+                    <span class="stat-value" id="stat-battery">--</span>
+                  </div>
+                  <div class="stat-box">
+                    <span class="stat-label">RESOLUTION</span>
+                    <span class="stat-value" id="stat-resolution">--</span>
+                  </div>
+                  <div class="stat-box full-width">
+                    <span class="stat-label">FREE STORAGE</span>
+                    <span class="stat-value" id="stat-storage">--</span>
+                  </div>
+                </div>
+                <button class="btn btn-outline btn-sm margin-top" id="btn-refresh-stats">Refresh Diagnostics</button>
+              </div>
+            </div>
+
+            <!-- UI System Toggles -->
+            <div class="card glass-card">
+              <div class="card-header">
+                <h3>🛠️ Developer UI System Toggles</h3>
+              </div>
+              <div class="card-body">
+                <div class="toggles-list">
+                  <div class="toggle-row">
+                    <div>
+                      <strong>Show Layout Bounds</strong>
+                      <p>Draw clip bounds, margins, and padding on screen (`debug.layout`)</p>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="chk-layout-bounds">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="toggle-row">
+                    <div>
+                      <strong>Pointer Location & Touches</strong>
+                      <p>Show current touch coordinates and taps on screen</p>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="chk-pointer-location">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="toggle-row">
+                    <div>
+                      <strong>Stay Awake While Plugged In</strong>
+                      <p>Keep screen awake while connected via USB</p>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="chk-stay-awake">
+                      <span class="slider"></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="density-box margin-top">
+                  <label>Change Display Density (DPI)</label>
+                  <div class="form-row">
+                    <input type="number" id="input-dpi" placeholder="e.g. 320, 420, 480" class="flex-2">
+                    <button class="btn btn-secondary btn-sm flex-1" id="btn-apply-dpi">Apply DPI</button>
+                    <button class="btn btn-outline btn-sm flex-1" id="btn-reset-dpi">Reset</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/app.js"></script>
+</body>
+</html>

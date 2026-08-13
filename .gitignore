@@ -1,0 +1,13 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Screenshots & Local user data
+screenshots/
+config.json
+.adb_developer_studio/
+
+# OS generated files
+.DS_Store
+Thumbs.db
