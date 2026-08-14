@@ -42,3 +42,6 @@ screenshots/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# UI Design Reference (mockups, not source)
+UI Plan/

@@ -15,9 +15,43 @@ class ADBStudioAPI:
         self.storage = StorageManager()
         self.dev_projects = DevProjectsManager()
 
+    def get_local_ip(self):
+        return self.adb.get_local_ip()
+
+    def generate_qr_pairing_info(self):
+        import random
+        ip = self.adb.get_local_ip()
+        passcode = f"{random.randint(100000, 999999)}"
+        service_name = f"ADB_Studio_{random.randint(1000, 9999)}"
+        # Android ADB QR Code standard payload format
+        qr_payload = f"WIFI:T:ADB;S:{service_name};P:{passcode};;"
+        return {
+            "ip": ip,
+            "passcode": passcode,
+            "service_name": service_name,
+            "qr_payload": qr_payload
+        }
+
+    def get_activity_log(self):
+        return self.storage.get_activity_log()
+
+    def log_activity(self, title, details="", type_icon="info"):
+        return self.storage.log_activity(title, details, type_icon)
+
+    def clear_activity_log(self):
+        return self.storage.clear_activity_log()
+
+    def restart_adb_server(self):
+        success, message = self.adb.restart_server()
+        if success:
+            self.storage.log_activity("ADB Server Restarted", "adb start-server", "server")
+        return {"success": success, "message": message}
+
     # --- Connection Management ---
     def get_devices(self):
         return self.adb.get_devices()
+
+
 
     def connect_wireless(self, ip, port):
         ip = ip.strip()
@@ -57,10 +91,33 @@ class ADBStudioAPI:
             "file_path": file_path
         }
 
-    def record_screen(self, target, duration_sec=15):
+    def take_screenshot_silent(self, target):
+        """Returns base64 screenshot without saving to disk - for live mirror stream use."""
+        success, b64_or_err = self.adb.take_screenshot_silent(target)
+        return {"success": success, "image_data": b64_or_err if success else "", "error": "" if success else b64_or_err}
+
+    def get_recent_captures(self):
         save_dir = self.storage.get_screenshot_dir()
+        return self.adb.get_recent_captures(save_dir, limit=6)
+
+    def get_capture_settings(self):
+        return self.storage.get_capture_settings()
+
+    def set_capture_setting(self, key, value):
+        return self.storage.set_capture_setting(key, value)
+
+    def get_video_dir(self):
+        return self.storage.get_video_dir()
+
+    def set_video_dir(self, directory):
+        self.storage.set_video_dir(directory)
+        return True
+
+    def record_screen(self, target, duration_sec=60):
+        save_dir = self.storage.get_video_dir()
         success, path_or_err = self.adb.record_screen(target, duration_sec, save_dir)
         return {"success": success, "file_path": path_or_err if success else "", "error": "" if success else path_or_err}
+
 
     def get_screenshot_dir(self):
         return self.storage.get_screenshot_dir()
@@ -99,6 +156,14 @@ class ADBStudioAPI:
         root.destroy()
         return file_path or ""
 
+    def select_any_file(self):
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        file_path = filedialog.askopenfilename(title="Select File to Upload")
+        root.destroy()
+        return file_path or ""
+
     # --- APK Installation & Dev Projects ---
     def install_apk(self, target, apk_path):
         success, message = self.adb.install_apk(target, apk_path)
@@ -106,18 +171,36 @@ class ADBStudioAPI:
 
     def get_projects(self):
         projects = self.storage.get_projects()
+        detailed_projects = []
         for p in projects:
-            p["apks"] = self.dev_projects.scan_project_apks(p["path"])
-        return projects
+            details = self.dev_projects.get_project_details(p["path"])
+            if details:
+                details["auto_install"] = p.get("auto_install", False)
+                detailed_projects.append(details)
+            else:
+                detailed_projects.append({
+                    "name": p.get("name", "Project"),
+                    "path": p["path"],
+                    "type": "Android",
+                    "platform": "Android",
+                    "created": "Unknown",
+                    "last_built": "Never",
+                    "status": "Idle",
+                    "apks": [],
+                    "latest_apk": None,
+                    "build_variant": "debug",
+                    "build_mode": "Debug",
+                    "auto_install": p.get("auto_install", False)
+                })
+        return detailed_projects
 
     def add_project(self, project_path=""):
         if not project_path:
             project_path = self.select_folder()
         if not project_path:
             return None
-        proj = self.storage.add_project(project_path)
-        proj["apks"] = self.dev_projects.scan_project_apks(project_path)
-        return proj
+        self.storage.add_project(project_path)
+        return self.dev_projects.get_project_details(project_path)
 
     def remove_project(self, project_path):
         self.storage.remove_project(project_path)
@@ -125,6 +208,12 @@ class ADBStudioAPI:
 
     def scan_project_apks(self, project_path):
         return self.dev_projects.scan_project_apks(project_path)
+
+    def build_project(self, project_path, build_variant="debug"):
+        return self.dev_projects.build_project(project_path, build_variant)
+
+    def clean_project(self, project_path):
+        return self.dev_projects.clean_project(project_path)
 
     # --- Device Diagnostics & App Management ---
     def get_device_info(self, target):
@@ -174,9 +263,119 @@ class ADBStudioAPI:
         success, message = self.adb.set_display_density(target, dpi_or_reset)
         return {"success": success, "message": message}
 
-    def fetch_logcat(self, target, lines=120, filter_tag="", min_level="V"):
-        logs = self.adb.fetch_logcat(target, lines, filter_tag, min_level)
-        return logs
+    def input_text(self, target, text):
+        success, message = self.adb.input_text(target, text)
+        return {"success": success, "message": message}
+
+    def launch_scrcpy(self, target):
+        success, message = self.adb.launch_scrcpy(target)
+        return {"success": success, "message": message}
+
+    # --- Device File Explorer ---
+    def list_files(self, target, remote_path="/sdcard/Download"):
+        success, items, error = self.adb.list_files(target, remote_path)
+        return {"success": success, "items": items, "error": error}
+
+    def push_file(self, target, local_path="", remote_dir="/sdcard/Download"):
+        if not local_path:
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            local_path = filedialog.askopenfilename(title="Select File to Push to Phone")
+            root.destroy()
+        if not local_path:
+            return {"success": False, "message": "No file selected"}
+        success, message = self.adb.push_file(target, local_path, remote_dir)
+        return {"success": success, "message": message}
+
+    def pull_file(self, target, remote_path, local_dir=""):
+        if not local_dir:
+            local_dir = self.storage.get_screenshot_dir()
+        success, path_or_err = self.adb.pull_file(target, remote_path, local_dir)
+        return {"success": success, "file_path": path_or_err if success else "", "error": "" if success else path_or_err}
+
+    # --- Terminal & Command Snippets ---
+    def run_custom_adb(self, target, raw_cmd):
+        success, output = self.adb.run_custom_adb(target, raw_cmd)
+        return {"success": success, "output": output}
+
+    def send_adb_shell(self, target, shell_cmd):
+        success, output = self.adb.send_adb_shell(target, shell_cmd)
+        return {"success": success, "output": output}
+
+    def change_brightness(self, target, delta):
+        success, message = self.adb.change_brightness(target, int(delta))
+        return {"success": success, "message": message}
+
+    def get_snippets(self):
+        return self.storage.get_snippets()
+
+    def add_snippet(self, title, cmd):
+        return self.storage.add_snippet(title, cmd)
+
+    def remove_snippet(self, title):
+        return self.storage.remove_snippet(title)
+
+    # --- Logcat Streaming ---
+    def start_logcat_stream(self, target):
+        return self.adb.start_logcat_stream(target)
+
+    def stop_logcat_stream(self, target):
+        return self.adb.stop_logcat_stream(target)
+
+    def poll_logcat_stream(self, target, since_seq=0):
+        return self.adb.poll_logcat_stream(target, since_seq)
+
+    def clear_logcat_stream(self, target):
+        return self.adb.clear_logcat_stream(target)
+
+    def resolve_package_pids(self, target, package_name):
+        return self.adb.resolve_package_pids(target, package_name)
+
+    def get_logcat_filters(self):
+        return self.storage.get_logcat_filters()
+
+    def save_logcat_filter(self, name, filter_config):
+        return self.storage.save_logcat_filter(name, filter_config)
+
+    def remove_logcat_filter(self, name):
+        return self.storage.remove_logcat_filter(name)
+
+    def export_text_file(self, content, default_filename="export.txt"):
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        file_path = filedialog.asksaveasfilename(
+            title="Export Logs",
+            initialfile=default_filename,
+            defaultextension=".txt",
+            filetypes=[("Text File", "*.txt"), ("Log File", "*.log"), ("All Files", "*.*")]
+        )
+        root.destroy()
+        if not file_path:
+            return {"success": False}
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return {"success": True, "path": file_path}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def open_logcat_window(self):
+        try:
+            index_path = Path(__file__).parent / "web" / "index.html"
+            webview.create_window(
+                title="ADB Developer Studio - Logcat",
+                url=f"{index_path.resolve()}?popout=logcat",
+                js_api=self,
+                width=1280,
+                height=780,
+                min_size=(720, 480),
+                background_color="#080B10"
+            )
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
 
 
 def main():
@@ -193,6 +392,7 @@ def main():
         min_size=(960, 640),
         background_color="#0F172A"
     )
+    window.events.closing += api.adb.stop_all_logcat_streams
 
     webview.start(debug=False)
 

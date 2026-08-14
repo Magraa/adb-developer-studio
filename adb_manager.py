@@ -2,14 +2,46 @@ import subprocess
 import base64
 import os
 import re
+import socket
+import threading
 import time
+from collections import deque
 from pathlib import Path
+
+LOGCAT_LINE_RE = re.compile(
+    r'^(?P<time>\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+'
+    r'(?P<pid>\d+)\s+(?P<tid>\d+)\s+(?P<level>[VDIWEF])\s+'
+    r'(?P<tag>.*?):\s?(?P<message>.*)$'
+)
 
 class ADBManager:
     """Core ADB wrapper executing CLI commands with error handling and data parsing."""
 
     def __init__(self, adb_path="adb"):
         self.adb_path = adb_path
+        self._logcat_streams = {}
+        self._logcat_streams_lock = threading.Lock()
+
+    @staticmethod
+    def get_local_ip():
+        """Gets local PC IP address on the Wi-Fi/LAN network."""
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "192.168.1.100"
+
+    def restart_server(self):
+        self._run_cmd(["kill-server"])
+        time.sleep(0.5)
+        success, stdout, stderr = self._run_cmd(["start-server"])
+        return success, (stdout or stderr)
+
+
+
 
     def _run_cmd(self, args, timeout=15):
         cmd = [self.adb_path] + args
@@ -130,6 +162,48 @@ class ADBManager:
         b64_str = "data:image/png;base64," + base64.b64encode(image_bytes).decode("utf-8")
         return True, b64_str, str(out_path.resolve())
 
+    def take_screenshot_silent(self, target):
+        """Takes screenshot to memory only - no file saved. Returns base64 only. Used for live mirror stream."""
+        args = ["-s", target, "exec-out", "screencap", "-p"] if target else ["exec-out", "screencap", "-p"]
+        success, image_bytes, stderr = self._run_bytes_cmd(args, timeout=8)
+        if not success or not image_bytes or not image_bytes.startswith(b"\x89PNG"):
+            return False, ""
+        b64_str = "data:image/png;base64," + base64.b64encode(image_bytes).decode("utf-8")
+        return True, b64_str
+
+    def get_recent_captures(self, save_dir, limit=6):
+        """Returns recent screenshot thumbnails, sizes, and timestamps from save_dir."""
+        s_dir = Path(save_dir)
+        if not s_dir.exists():
+            return []
+
+        captures = []
+        for ext in ["*.png", "*.jpg", "*.jpeg", "*.webp"]:
+            for img_file in s_dir.glob(ext):
+                try:
+                    stat = img_file.stat()
+                    mod_time = time.localtime(stat.st_mtime)
+                    time_str = time.strftime("%H:%M:%S", mod_time)
+                    size_mb = f"{stat.st_size / (1024*1024):.1f} MB" if stat.st_size >= 1024*1024 else f"{round(stat.st_size / 1024)} KB"
+                    
+                    with open(img_file, "rb") as f:
+                        b64 = "data:image/png;base64," + base64.b64encode(f.read()).decode("utf-8")
+
+                    captures.append({
+                        "name": img_file.name,
+                        "path": str(img_file.resolve()),
+                        "time_str": time_str,
+                        "size_str": size_mb,
+                        "mtime": stat.st_mtime,
+                        "b64": b64
+                    })
+                except Exception:
+                    pass
+
+        captures.sort(key=lambda x: x["mtime"], reverse=True)
+        return captures[:limit]
+
+
     def record_screen(self, target, duration_sec, save_dir):
         """Records device screen for given duration (in seconds) and pulls MP4 to PC."""
         target_args = ["-s", target] if target else []
@@ -215,6 +289,26 @@ class ADBManager:
                 info["storage_free"] = f"{parts[3]} free of {parts[1]}"
 
         return info
+
+    def send_adb_shell(self, target, shell_cmd):
+        """Runs an arbitrary adb shell command."""
+        target_args = ["-s", target] if target else []
+        cmd_parts = shell_cmd.split()
+        success, stdout, stderr = self._run_cmd(target_args + ["shell"] + cmd_parts)
+        return success, (stdout or stderr)
+
+    def change_brightness(self, target, delta):
+        """Changes screen brightness by delta (-255 to +255)."""
+        target_args = ["-s", target] if target else []
+        # Get current brightness
+        _, current_str, _ = self._run_cmd(target_args + ["shell", "settings", "get", "system", "screen_brightness"])
+        try:
+            current = int(current_str.strip())
+        except:
+            current = 128
+        new_val = max(10, min(255, current + delta))
+        success, stdout, stderr = self._run_cmd(target_args + ["shell", "settings", "put", "system", "screen_brightness", str(new_val)])
+        return success, f"Brightness: {new_val}/255"
 
     def list_installed_packages(self, target, third_party_only=True):
         """Lists third-party installed packages."""
@@ -310,22 +404,228 @@ class ADBManager:
         success, stdout, stderr = self._run_cmd(target_args + cmd)
         return success, (stdout or stderr)
 
-    def fetch_logcat(self, target, lines=100, filter_tag="", min_level="V"):
-        """Fetches recent logcat entries."""
+    def input_text(self, target, text):
+        """Types text into currently focused input field on device."""
         target_args = ["-s", target] if target else []
-        # Filter format: *:V, *:D, *:I, *:W, *:E, *:F
-        log_filter = f"*:{min_level.upper()}"
-        cmd = target_args + ["shell", "logcat", "-d", "-t", str(lines), log_filter]
-        success, stdout, stderr = self._run_cmd(cmd, timeout=8)
-        if not success:
-            return []
+        # Escape special shell characters for adb input text
+        escaped_text = text.replace(" ", "%s").replace("&", "\\&").replace("<", "\\<").replace(">", "\\>").replace('"', '\\"').replace("'", "\\'")
+        success, stdout, stderr = self._run_cmd(target_args + ["shell", "input", "text", escaped_text])
+        return success, (stdout or stderr)
 
-        parsed_logs = []
+    def launch_scrcpy(self, target):
+        """Attempts to launch scrcpy for low-latency screen mirroring."""
+        import shutil
+        scrcpy_bin = shutil.which("scrcpy")
+        if not scrcpy_bin:
+            return False, "scrcpy binary not found in PATH. Install scrcpy to enable screen mirroring."
+
+        target_args = ["-s", target] if target else []
+        cmd = ([scrcpy_bin] + target_args +
+               ["--always-on-top", "--stay-awake",
+                "--max-size", "1024",
+                "--video-bit-rate", "4M",
+                "--max-fps", "60",
+                "--no-audio"])
+        try:
+            subprocess.Popen(cmd, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+            return True, "scrcpy launched successfully!"
+        except Exception as e:
+            return False, f"Failed to launch scrcpy: {e}"
+
+    def list_files(self, target, remote_path="/sdcard/Download"):
+        """Lists files and folders in specified device directory."""
+        target_args = ["-s", target] if target else []
+        path = remote_path.strip() or "/sdcard/Download"
+        success, stdout, stderr = self._run_cmd(target_args + ["shell", "ls", "-la", f'"{path}"'])
+        if not success:
+            return False, [], f"Failed to list directory: {stderr}"
+
+        items = []
         for line in stdout.splitlines():
             line = line.strip()
-            if not line or line.startswith("------"):
+            if not line or line.startswith("total "):
                 continue
-            if filter_tag and filter_tag.lower() not in line.lower():
-                continue
-            parsed_logs.append(line)
-        return parsed_logs
+            parts = line.split(maxsplit=7)
+            if len(parts) >= 8:
+                perms = parts[0]
+                is_dir = perms.startswith("d") or perms.startswith("l")
+                size = parts[4]
+                name = parts[7]
+                if name in [".", ".."]:
+                    continue
+                # Handle symlinks
+                if " -> " in name:
+                    name = name.split(" -> ")[0]
+
+                modified_str = "--"
+                try:
+                    full_parts = line.split(maxsplit=8)
+                    if len(full_parts) >= 9:
+                        month = full_parts[5]
+                        day = full_parts[6]
+                        time_or_year = full_parts[7]
+                        modified_str = f"{month} {day} {time_or_year}"
+                except Exception:
+                    pass
+
+                items.append({
+                    "name": name,
+                    "is_dir": is_dir,
+                    "size": size if not is_dir else "--",
+                    "permissions": perms,
+                    "path": f"{path.rstrip('/')}/{name}",
+                    "modified": modified_str
+                })
+
+        # Sort: directories first, then files alphabetically
+        items.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
+        return True, items, ""
+
+    def push_file(self, target, local_path, remote_dir="/sdcard/Download"):
+        """Pushes a file from PC to device directory."""
+        if not os.path.exists(local_path):
+            return False, f"Local file not found: {local_path}"
+        target_args = ["-s", target] if target else []
+        cmd = target_args + ["push", local_path, remote_dir]
+        success, stdout, stderr = self._run_cmd(cmd, timeout=120)
+        return success, (stdout or stderr)
+
+    def pull_file(self, target, remote_path, local_dir):
+        """Pulls a file from device to local PC directory."""
+        target_args = ["-s", target] if target else []
+        local_target = Path(local_dir) / Path(remote_path).name
+        cmd = target_args + ["pull", remote_path, str(local_target)]
+        success, stdout, stderr = self._run_cmd(cmd, timeout=120)
+        if success and local_target.exists():
+            return True, str(local_target.resolve())
+        return False, (stdout or stderr)
+
+    def run_custom_adb(self, target, raw_cmd):
+        """Executes a custom ADB CLI or shell command."""
+        cmd_str = raw_cmd.strip()
+        if cmd_str.startswith("adb "):
+            cmd_str = cmd_str[4:]
+        
+        args = cmd_str.split()
+        if target and "-s" not in args:
+            args = ["-s", target] + args
+            
+        success, stdout, stderr = self._run_cmd(args, timeout=30)
+        return success, (stdout or stderr)
+
+    @staticmethod
+    def _parse_logcat_line(raw_line):
+        """Parses a `logcat -v threadtime` line into structured fields."""
+        m = LOGCAT_LINE_RE.match(raw_line)
+        if m:
+            return {
+                "time": m.group("time"),
+                "pid": m.group("pid"),
+                "tid": m.group("tid"),
+                "level": m.group("level"),
+                "tag": m.group("tag").strip(),
+                "message": m.group("message"),
+                "raw": raw_line,
+            }
+        return {"time": "", "pid": "", "tid": "", "level": "I", "tag": "", "message": raw_line, "raw": raw_line}
+
+    def start_logcat_stream(self, target):
+        """Starts (or reuses) a persistent `adb logcat` process for the given device, tailed by a background reader thread."""
+        with self._logcat_streams_lock:
+            existing = self._logcat_streams.get(target)
+            if existing and existing["proc"].poll() is None:
+                return {"success": True}
+
+            target_args = ["-s", target] if target else []
+            cmd = [self.adb_path] + target_args + ["logcat", "-v", "threadtime"]
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+                )
+            except Exception as e:
+                return {"success": False, "message": str(e)}
+
+            stream_state = {
+                "proc": proc,
+                "buffer": deque(maxlen=8000),
+                "seq": 0,
+                "lock": threading.Lock(),
+            }
+            self._logcat_streams[target] = stream_state
+
+        def _reader():
+            try:
+                for raw_line in stream_state["proc"].stdout:
+                    raw_line = raw_line.rstrip("\n").rstrip("\r")
+                    if not raw_line.strip() or raw_line.startswith("---------"):
+                        continue
+                    entry = self._parse_logcat_line(raw_line)
+                    with stream_state["lock"]:
+                        stream_state["seq"] += 1
+                        entry["seq"] = stream_state["seq"]
+                        stream_state["buffer"].append(entry)
+            except Exception:
+                pass
+
+        threading.Thread(target=_reader, daemon=True).start()
+        return {"success": True}
+
+    def stop_logcat_stream(self, target):
+        """Terminates the background logcat process for the given device."""
+        with self._logcat_streams_lock:
+            stream_state = self._logcat_streams.pop(target, None)
+        if stream_state:
+            try:
+                stream_state["proc"].terminate()
+            except Exception:
+                pass
+        return {"success": True}
+
+    def poll_logcat_stream(self, target, since_seq=0):
+        """Returns log entries appended since `since_seq` (incremental, no duplicates)."""
+        stream_state = self._logcat_streams.get(target)
+        if not stream_state:
+            return {"running": False, "entries": [], "last_seq": since_seq, "total_buffered": 0}
+
+        with stream_state["lock"]:
+            entries = [e for e in stream_state["buffer"] if e["seq"] > since_seq]
+            last_seq = stream_state["buffer"][-1]["seq"] if stream_state["buffer"] else since_seq
+            total_buffered = len(stream_state["buffer"])
+
+        running = stream_state["proc"].poll() is None
+        return {"running": running, "entries": entries, "last_seq": last_seq, "total_buffered": total_buffered}
+
+    def clear_logcat_stream(self, target):
+        """Clears the in-memory buffer (and device-side ring buffer) for the given device."""
+        stream_state = self._logcat_streams.get(target)
+        if stream_state:
+            with stream_state["lock"]:
+                stream_state["buffer"].clear()
+                stream_state["seq"] = 0
+        target_args = ["-s", target] if target else []
+        self._run_cmd(target_args + ["logcat", "-c"], timeout=5)
+        return {"success": True}
+
+    def resolve_package_pids(self, target, package_name):
+        """Resolves the current PID(s) of a running package, used for package-scoped log filtering."""
+        if not package_name:
+            return []
+        target_args = ["-s", target] if target else []
+        success, stdout, _ = self._run_cmd(target_args + ["shell", "pidof", package_name], timeout=5)
+        if not success or not stdout.strip():
+            return []
+        return stdout.strip().split()
+
+    def stop_all_logcat_streams(self):
+        """Terminates every background logcat process, used on app shutdown to avoid orphaned adb processes."""
+        with self._logcat_streams_lock:
+            targets = list(self._logcat_streams.keys())
+        for target in targets:
+            self.stop_logcat_stream(target)
+        return {"success": True}

@@ -20,14 +20,112 @@ class StorageManager:
         return self._default_config()
 
     def _default_config(self):
-        default_screenshot_dir = str(Path.home() / "Pictures" / "ADB_Screenshots")
+        default_screenshot_dir = str(Path.home() / "Pictures" / "ADB_Studio")
+        default_video_dir = str(Path.home() / "Videos" / "ADB_Studio")
         return {
-            "recent_devices": [], # List of {"ip": "192.168.1.50", "port": "5555", "alias": "My Phone"}
-            "projects": [], # List of {"path": "E:/Projects/MyApp", "name": "MyApp", "auto_install": False}
+            "recent_devices": [],
+            "projects": [],
             "screenshot_dir": default_screenshot_dir,
+            "video_dir": default_video_dir,
             "theme": "cyber_dark",
-            "auto_connect_last": True
+            "auto_connect_last": True,
+            "snippets": [
+                {"title": "Current Active Focus Window", "cmd": "shell dumpsys window windows | grep -E 'mCurrentFocus'"},
+                {"title": "Installed Packages Count", "cmd": "shell pm list packages | wc -l"},
+                {"title": "Device Model & Build Info", "cmd": "shell getprop ro.product.model"},
+                {"title": "Dump Battery Info", "cmd": "shell dumpsys battery"},
+                {"title": "List Running Services", "cmd": "shell dumpsys activity services"}
+            ],
+            "activity_log": [],
+            "capture_settings": {
+                "auto_copy_clipboard": True,
+                "auto_open_folder": False,
+                "image_format": "PNG",
+                "image_quality": "100% (Best)",
+                "record_max_duration": "60 seconds",
+                "record_resolution": "1080 × 2400 (Device)"
+            }
         }
+
+    def get_capture_settings(self):
+        return self.data.get("capture_settings", self._default_config()["capture_settings"])
+
+    def set_capture_setting(self, key, value):
+        settings = self.get_capture_settings()
+        settings[key] = value
+        self.data["capture_settings"] = settings
+        self.save()
+        return settings
+
+    def get_video_dir(self):
+        v_dir = self.data.get("video_dir")
+        if not v_dir:
+            v_dir = str(Path.home() / "Videos" / "ADB_Studio")
+        Path(v_dir).mkdir(parents=True, exist_ok=True)
+        return v_dir
+
+    def set_video_dir(self, directory):
+        self.data["video_dir"] = directory
+        self.save()
+
+
+    def get_activity_log(self):
+        return self.data.get("activity_log", [])
+
+    def log_activity(self, title, details="", type_icon="info"):
+        import time
+        logs = self.get_activity_log()
+        time_str = time.strftime("%H:%M")
+        logs.insert(0, {
+            "title": title,
+            "details": details,
+            "time": time_str,
+            "type": type_icon
+        })
+        # Keep last 30 activity logs
+        self.data["activity_log"] = logs[:30]
+        self.save()
+        return logs
+
+    def clear_activity_log(self):
+        self.data["activity_log"] = []
+        self.save()
+        return []
+
+
+    def get_snippets(self):
+        return self.data.get("snippets", self._default_config()["snippets"])
+
+    def add_snippet(self, title, cmd):
+        snippets = self.get_snippets()
+        snippets.append({"title": title, "cmd": cmd})
+        self.data["snippets"] = snippets
+        self.save()
+        return snippets
+
+    def remove_snippet(self, title):
+        snippets = [s for s in self.get_snippets() if s.get("title") != title]
+        self.data["snippets"] = snippets
+        self.save()
+        return snippets
+
+
+    def get_logcat_filters(self):
+        return self.data.get("logcat_filters", [])
+
+    def save_logcat_filter(self, name, filter_config):
+        filters = [f for f in self.get_logcat_filters() if f.get("name") != name]
+        filters.append({"name": name, "config": filter_config})
+        self.data["logcat_filters"] = filters
+        self.save()
+        return filters
+
+    def remove_logcat_filter(self, name):
+        filters = [f for f in self.get_logcat_filters() if f.get("name") != name]
+        self.data["logcat_filters"] = filters
+        self.save()
+        return filters
+
 
     def save(self):
         try:
