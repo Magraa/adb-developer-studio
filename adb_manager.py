@@ -78,38 +78,69 @@ class ADBManager:
             return False, b"", str(e)
 
     def get_devices(self):
-        """Returns list of connected ADB devices with details."""
+        """Returns list of connected, ready ADB devices.
+        Only returns devices with status 'device' (skips offline/unauthorized/mDNS transport entries)."""
         success, stdout, stderr = self._run_cmd(["devices", "-l"])
         if not success:
             return []
 
         devices = []
+        seen_ips = set()  # deduplicate: prefer IP:port over mDNS transport
         lines = stdout.splitlines()
         for line in lines[1:]:
             line = line.strip()
             if not line:
                 continue
             parts = line.split()
-            if len(parts) >= 2:
-                serial = parts[0]
-                status = parts[1]
-                
-                info = {"serial": serial, "status": status, "model": serial, "connection": "usb"}
-                if ":" in serial:
-                    info["connection"] = "wireless"
-                
-                for item in parts[2:]:
-                    if ":" in item:
-                        k, v = item.split(":", 1)
-                        if k == "model":
-                            info["model"] = v
-                        elif k == "product":
-                            info["product"] = v
-                        elif k == "device":
-                            info["device_name"] = v
-                
-                devices.append(info)
-        return devices
+            if len(parts) < 2:
+                continue
+            serial = parts[0]
+            status = parts[1]
+
+            # Only include fully authorized, ready devices
+            if status != "device":
+                continue
+
+            # Detect connection type
+            is_wireless = False
+            if ":" in serial and serial[0].isdigit():        # IP:port  e.g. 192.168.1.5:41101
+                is_wireless = True
+                ip = serial.split(":")[0]
+                seen_ips.add(ip)
+            elif serial.startswith("adb-"):                   # mDNS transport handle
+                is_wireless = True
+
+            info = {
+                "serial": serial,
+                "status": status,
+                "model": serial,
+                "connection": "wireless" if is_wireless else "usb",
+            }
+
+            for item in parts[2:]:
+                if ":" in item:
+                    k, v = item.split(":", 1)
+                    if k == "model":
+                        info["model"] = v.replace("_", " ")
+                    elif k == "product":
+                        info["product"] = v
+                    elif k == "device":
+                        info["device_name"] = v
+
+            devices.append(info)
+
+        # Deduplicate: if we have both IP:port AND mDNS handle for the same device, keep IP:port
+        seen_mdns_ips = set()
+        final = []
+        for d in devices:
+            if d["serial"].startswith("adb-"):
+                # only keep mDNS entry if no IP:port entry for same device
+                # (we can't easily match without resolving, so just skip mDNS if any IP entry exists)
+                if not seen_ips:
+                    final.append(d)
+            else:
+                final.append(d)
+        return final
 
     def connect_wireless(self, ip, port):
         """Connects to a wireless ADB device (ip:port)."""
