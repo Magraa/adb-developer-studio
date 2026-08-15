@@ -137,17 +137,46 @@ class ADBManager:
         success, stdout, stderr = self._run_cmd(["disconnect", target])
         return success, stdout or stderr
 
+    def _screencap_bytes(self, target, timeout=15):
+        """Captures screen bytes via a reliable pull-based method.
+        Works on USB and wireless ADB, avoids Windows CRLF corruption in exec-out."""
+        import tempfile, uuid
+        remote_tmp = f"/sdcard/.adbstudio_cap_{uuid.uuid4().hex[:8]}.png"
+        target_args = ["-s", target] if target else []
+
+        # Step 1: capture to device temp file
+        ok, _, err = self._run_cmd(target_args + ["shell", "screencap", "-p", remote_tmp], timeout=timeout)
+        if not ok:
+            # Clean up just in case
+            self._run_cmd(target_args + ["shell", "rm", "-f", remote_tmp], timeout=5)
+            return False, b"", f"screencap failed: {err}"
+
+        # Step 2: pull to local temp file
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                local_tmp = tmp.name
+            ok2, _, err2 = self._run_cmd(target_args + ["pull", remote_tmp, local_tmp], timeout=timeout)
+            self._run_cmd(target_args + ["shell", "rm", "-f", remote_tmp], timeout=5)
+            if not ok2:
+                return False, b"", f"adb pull failed: {err2}"
+            with open(local_tmp, "rb") as f:
+                image_bytes = f.read()
+            try:
+                os.remove(local_tmp)
+            except Exception:
+                pass
+            if not image_bytes or not image_bytes.startswith(b"\x89PNG"):
+                return False, b"", "Invalid PNG data from device"
+            return True, image_bytes, ""
+        except Exception as e:
+            return False, b"", str(e)
+
     def take_screenshot(self, target, save_dir):
-        """Takes screenshot via exec-out screencap, saves PNG, and returns base64 & file path."""
-        args = ["-s", target, "exec-out", "screencap", "-p"] if target else ["exec-out", "screencap", "-p"]
-        success, image_bytes, stderr = self._run_bytes_cmd(args, timeout=12)
-
-        if not success or not image_bytes:
-            return False, f"Screenshot failed: {stderr}", ""
-
-        # Verify PNG header (\x89PNG)
-        if not image_bytes.startswith(b"\x89PNG"):
-            return False, "Invalid image data received from device", ""
+        """Takes screenshot, saves PNG, and returns base64 & file path.
+        Works over USB and wireless ADB."""
+        success, image_bytes, err = self._screencap_bytes(target, timeout=20)
+        if not success:
+            return False, f"Screenshot failed: {err}", ""
 
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         filename = f"screenshot_{timestamp}.png"
@@ -164,11 +193,11 @@ class ADBManager:
         return True, b64_str, str(out_path.resolve())
 
     def take_screenshot_silent(self, target):
-        """Takes screenshot to memory only - no file saved. Returns base64 only. Used for live mirror stream."""
-        args = ["-s", target, "exec-out", "screencap", "-p"] if target else ["exec-out", "screencap", "-p"]
-        success, image_bytes, stderr = self._run_bytes_cmd(args, timeout=8)
-        if not success or not image_bytes or not image_bytes.startswith(b"\x89PNG"):
-            return False, ""
+        """Takes screenshot to memory only (no file saved) for live mirror stream.
+        Uses pull-based capture: works on USB and wireless ADB connections."""
+        success, image_bytes, err = self._screencap_bytes(target, timeout=15)
+        if not success:
+            return False, err  # return actual error so JS overlay shows it
         b64_str = "data:image/png;base64," + base64.b64encode(image_bytes).decode("utf-8")
         return True, b64_str
 

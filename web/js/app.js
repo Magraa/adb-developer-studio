@@ -2241,7 +2241,7 @@ async function fetchMirrorFrame() {
     const errMsg = (res && res.error) ? res.error : 'ADB screenshot failed.';
     if (mirrorConsecFails >= MIRROR_MAX_FAILS) {
       stopMirrorStream();
-      setMirrorOverlayState(`Stream stopped: ${errMsg}\n\nMake sure your device is unlocked and USB debugging is enabled.`, true);
+      setMirrorOverlayState(`Stream stopped: ${errMsg}\n\nMake sure your device is unlocked and ADB debugging is authorized (USB or Wireless).`, true);
       showToast(`Live Mirror stopped: ${errMsg}`, 'error');
     } else {
       setMirrorOverlayState(`Waiting for device frame... (${mirrorConsecFails}/${MIRROR_MAX_FAILS})`, false);
