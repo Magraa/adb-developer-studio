@@ -935,13 +935,18 @@
                   </h3>
                 </div>
                 <div class="card-body">
-                  <p class="subtext" style="margin-bottom:12px;">Mirror your Android device screen in real-time using scrcpy or the built-in live stream.</p>
-                  <button class="btn btn-primary btn-block" id="btn-launch-scrcpy">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    <span>Launch Screen Mirror</span>
-                  </button>
+                  <div class="btn-group-vertical" style="display:flex;flex-direction:column;gap:8px">
+                    <button class="btn btn-primary btn-block" id="btn-launch-scrcpy">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      <span>Launch Native scrcpy</span>
+                    </button>
+                    <button class="btn btn-secondary btn-block" id="btn-open-builtin-mirror">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                      <span>Open Built-in Live Mirror</span>
+                    </button>
+                  </div>
                   <p class="subtext margin-top-xs" style="font-size:11px">
-                    Requires <code>scrcpy</code> in PATH, or falls back to live screenshot stream.
+                    Native mode requires <code>scrcpy</code> in PATH or project folder. Built-in stream works everywhere.
                   </p>
                 </div>
               </div>
@@ -1696,6 +1701,7 @@
         </div>
         <div class="btn-group">
           <button class="btn btn-outline btn-xs" id="btn-toggle-mirror-stream">Pause Stream</button>
+          <button class="btn btn-secondary btn-xs" id="btn-maximize-mirror-modal" title="Maximize Screen Mirror Dialog">🗖 Maximize</button>
           <button class="icon-btn-sm modal-close-btn" id="btn-close-mirror-modal">✕</button>
         </div>
       </div>

@@ -58,7 +58,7 @@ body {
 
 /* Mirroring Modal Styling */
 .mirror-canvas-wrapper {
-  max-height: 480px;
+  max-height: 520px;
   min-height: 320px;
   background: #050811;
   border: 1px solid var(--border-glass);
@@ -68,14 +68,52 @@ body {
   justify-content: center;
   overflow: hidden;
   padding: 10px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .mirror-stream-img {
-  max-height: 450px;
+  max-height: 490px;
   max-width: 100%;
   object-fit: contain;
   border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Maximized Screen Mirror Dialog State */
+.modal-overlay.modal-maximized {
+  padding: 12px;
+}
+
+.modal-overlay.modal-maximized .modal-card-box.modal-lg {
+  width: 98vw !important;
+  max-width: 98vw !important;
+  height: 95vh !important;
+  max-height: 95vh !important;
+  display: flex;
+  flex-direction: column;
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 50px rgba(99, 102, 241, 0.25);
+}
+
+.modal-overlay.modal-maximized .modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.modal-overlay.modal-maximized .mirror-canvas-wrapper {
+  flex: 1;
+  max-height: calc(95vh - 150px) !important;
+  min-height: 400px;
+  background: #02040a;
+}
+
+.modal-overlay.modal-maximized .mirror-stream-img {
+  max-height: calc(95vh - 170px) !important;
+  height: 100%;
 }
 
 .mirror-controls-bar {

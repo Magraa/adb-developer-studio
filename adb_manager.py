@@ -415,9 +415,26 @@ class ADBManager:
     def launch_scrcpy(self, target):
         """Attempts to launch scrcpy for low-latency screen mirroring."""
         import shutil
-        scrcpy_bin = shutil.which("scrcpy")
+        scrcpy_bin = shutil.which("scrcpy") or shutil.which("scrcpy.exe")
+
         if not scrcpy_bin:
-            return False, "scrcpy binary not found in PATH. Install scrcpy to enable screen mirroring."
+            possible_paths = [
+                os.path.join(self.base_dir, "scrcpy.exe"),
+                os.path.join(self.base_dir, "scrcpy", "scrcpy.exe"),
+                os.path.join(self.base_dir, "bin", "scrcpy.exe"),
+                r"C:\scrcpy\scrcpy.exe",
+                os.path.expanduser(r"~\scrcpy\scrcpy.exe"),
+                os.path.expanduser(r"~\AppData\Local\Programs\scrcpy\scrcpy.exe"),
+                r"C:\Program Files\scrcpy\scrcpy.exe",
+                r"C:\Program Files (x86)\scrcpy\scrcpy.exe",
+            ]
+            for path in possible_paths:
+                if os.path.exists(path):
+                    scrcpy_bin = path
+                    break
+
+        if not scrcpy_bin:
+            return False, "scrcpy binary not found in PATH or project folder."
 
         target_args = ["-s", target] if target else []
         cmd = ([scrcpy_bin] + target_args +

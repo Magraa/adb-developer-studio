@@ -2130,12 +2130,16 @@ document.addEventListener('click', async (e) => {
 let mirrorStreamTimer = null;
 let mirrorStreamActive = false;
 
-const modalScreenMirror = document.getElementById('modal-screen-mirror');
-const lblMirrorDeviceName = document.getElementById('lbl-mirror-device-name');
-const mirrorStreamImg = document.getElementById('mirror-stream-img');
-const btnToggleMirrorStream = document.getElementById('btn-toggle-mirror-stream');
-const btnCloseMirrorModal = document.getElementById('btn-close-mirror-modal');
-const btnMirrorTakeScreenshot = document.getElementById('btn-mirror-take-screenshot');
+const btnMaximizeMirrorModal = document.getElementById('btn-maximize-mirror-modal');
+const btnOpenBuiltinMirror = document.getElementById('btn-open-builtin-mirror');
+
+function openBuiltinMirror() {
+  if (!state.selectedDevice) return showToast('Select a target device first!', 'error');
+  if (lblMirrorDeviceName) lblMirrorDeviceName.innerText = `Target: ${state.selectedDevice}`;
+  modalScreenMirror.classList.remove('hidden');
+  startMirrorStream();
+  logActivity('Opened Built-in Live Mirror', state.selectedDevice, 'mirror');
+}
 
 async function openScreenMirroring() {
   if (!state.selectedDevice) return showToast('Select a target device first!', 'error');
@@ -2147,11 +2151,8 @@ async function openScreenMirroring() {
     logActivity('Launched Screen Mirror', state.selectedDevice, 'mirror');
   } else {
     // Fall back to built-in live screenshot stream modal
-    showToast('scrcpy not found in PATH. Opening built-in Live Screen Mirror...', 'info');
-    if (lblMirrorDeviceName) lblMirrorDeviceName.innerText = `Target: ${state.selectedDevice}`;
-    modalScreenMirror.classList.remove('hidden');
-    startMirrorStream();
-    logActivity('Opened Built-in Live Mirror', state.selectedDevice, 'mirror');
+    showToast('scrcpy not found in PATH/project folder. Opening built-in Live Screen Mirror...', 'info');
+    openBuiltinMirror();
   }
 }
 
@@ -2159,6 +2160,7 @@ function startMirrorStream() {
   mirrorStreamActive = true;
   if (btnToggleMirrorStream) btnToggleMirrorStream.innerText = 'Pause Stream';
   fetchMirrorFrame();
+  if (mirrorStreamTimer) clearInterval(mirrorStreamTimer);
   mirrorStreamTimer = setInterval(fetchMirrorFrame, 400);
 }
 
@@ -2180,6 +2182,19 @@ if (btnCloseMirrorModal) {
   btnCloseMirrorModal.addEventListener('click', () => {
     stopMirrorStream();
     modalScreenMirror.classList.add('hidden');
+    modalScreenMirror.classList.remove('modal-maximized');
+    if (btnMaximizeMirrorModal) {
+      btnMaximizeMirrorModal.innerHTML = '🗖 Maximize';
+      btnMaximizeMirrorModal.title = 'Maximize Screen Mirror Dialog';
+    }
+  });
+}
+
+if (btnMaximizeMirrorModal) {
+  btnMaximizeMirrorModal.addEventListener('click', () => {
+    const isMaximized = modalScreenMirror.classList.toggle('modal-maximized');
+    btnMaximizeMirrorModal.innerHTML = isMaximized ? '🗗 Restore' : '🗖 Maximize';
+    btnMaximizeMirrorModal.title = isMaximized ? 'Restore Screen Mirror Dialog' : 'Maximize Screen Mirror Dialog';
   });
 }
 
@@ -2197,6 +2212,10 @@ if (btnMirrorTakeScreenshot) {
 const btnLaunchScrcpy = document.getElementById('btn-launch-scrcpy');
 if (btnLaunchScrcpy) {
   btnLaunchScrcpy.addEventListener('click', openScreenMirroring);
+}
+
+if (btnOpenBuiltinMirror) {
+  btnOpenBuiltinMirror.addEventListener('click', openBuiltinMirror);
 }
 
 // Browse APK Handler
