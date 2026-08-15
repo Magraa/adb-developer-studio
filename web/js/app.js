@@ -2196,14 +2196,12 @@ async function openScreenMirroring() {
   const target = await ensureSelectedDevice();
   if (!target) return showToast('No Android device connected! Connect via USB or Wi-Fi first.', 'error');
 
-  showToast('Attempting to launch native scrcpy...', 'info');
   const scrcpyRes = await callBridge('launch_scrcpy', target);
   if (scrcpyRes && scrcpyRes.success) {
-    showToast(scrcpyRes.message, 'success');
+    showToast('✅ scrcpy launched!', 'success');
     logActivity('Launched Native scrcpy Screen Mirror', target, 'mirror');
   } else {
-    const msg = (scrcpyRes && scrcpyRes.message) ? scrcpyRes.message : 'scrcpy not found.';
-    showToast(`${msg} Opening built-in Live Mirror instead...`, 'info');
+    // Silently fall back to built-in mirror — no noisy toasts since this is the normal path
     openBuiltinMirror();
   }
 }
