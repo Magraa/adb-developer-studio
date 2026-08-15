@@ -2127,31 +2127,51 @@ document.addEventListener('click', async (e) => {
 });
 
 // Built-in Screen Mirroring & Fallback Stream
+// Built-in Screen Mirroring & Fallback Stream
 let mirrorStreamTimer = null;
 let mirrorStreamActive = false;
 
+const modalScreenMirror = document.getElementById('modal-screen-mirror');
+const lblMirrorDeviceName = document.getElementById('lbl-mirror-device-name');
+const mirrorStreamImg = document.getElementById('mirror-stream-img');
+const btnToggleMirrorStream = document.getElementById('btn-toggle-mirror-stream');
+const btnCloseMirrorModal = document.getElementById('btn-close-mirror-modal');
+const btnMirrorTakeScreenshot = document.getElementById('btn-mirror-take-screenshot');
 const btnMaximizeMirrorModal = document.getElementById('btn-maximize-mirror-modal');
 const btnOpenBuiltinMirror = document.getElementById('btn-open-builtin-mirror');
 
-function openBuiltinMirror() {
-  if (!state.selectedDevice) return showToast('Select a target device first!', 'error');
-  if (lblMirrorDeviceName) lblMirrorDeviceName.innerText = `Target: ${state.selectedDevice}`;
-  modalScreenMirror.classList.remove('hidden');
+async function ensureSelectedDevice() {
+  if (!state.selectedDevice) {
+    const devices = await callBridge('get_devices') || [];
+    if (devices.length > 0) {
+      state.selectedDevice = devices[0].serial.trim();
+    }
+  }
+  return state.selectedDevice;
+}
+
+async function openBuiltinMirror() {
+  const target = await ensureSelectedDevice();
+  if (!target) return showToast('No attached Android device found! Connect a phone via USB or Wi-Fi first.', 'error');
+  if (lblMirrorDeviceName) lblMirrorDeviceName.innerText = `Target: ${target}`;
+  if (modalScreenMirror) modalScreenMirror.classList.remove('hidden');
   startMirrorStream();
-  logActivity('Opened Built-in Live Mirror', state.selectedDevice, 'mirror');
+  logActivity('Opened Built-in Live Mirror', target, 'mirror');
 }
 
 async function openScreenMirroring() {
-  if (!state.selectedDevice) return showToast('Select a target device first!', 'error');
+  const target = await ensureSelectedDevice();
+  if (!target) return showToast('No attached Android device found! Connect a phone via USB or Wi-Fi first.', 'error');
 
   showToast('Attempting to launch scrcpy...', 'info');
-  const scrcpyRes = await callBridge('launch_scrcpy', state.selectedDevice);
+  const scrcpyRes = await callBridge('launch_scrcpy', target);
   if (scrcpyRes && scrcpyRes.success) {
     showToast(scrcpyRes.message, 'success');
-    logActivity('Launched Screen Mirror', state.selectedDevice, 'mirror');
+    logActivity('Launched Native scrcpy Screen Mirror', target, 'mirror');
   } else {
     // Fall back to built-in live screenshot stream modal
-    showToast('scrcpy not found in PATH/project folder. Opening built-in Live Screen Mirror...', 'info');
+    const msg = (scrcpyRes && scrcpyRes.message) ? scrcpyRes.message : 'scrcpy not found. Opening built-in Live Screen Mirror...';
+    showToast(msg, 'info');
     openBuiltinMirror();
   }
 }
@@ -2181,8 +2201,10 @@ async function fetchMirrorFrame() {
 if (btnCloseMirrorModal) {
   btnCloseMirrorModal.addEventListener('click', () => {
     stopMirrorStream();
-    modalScreenMirror.classList.add('hidden');
-    modalScreenMirror.classList.remove('modal-maximized');
+    if (modalScreenMirror) {
+      modalScreenMirror.classList.add('hidden');
+      modalScreenMirror.classList.remove('modal-maximized');
+    }
     if (btnMaximizeMirrorModal) {
       btnMaximizeMirrorModal.innerHTML = '🗖 Maximize';
       btnMaximizeMirrorModal.title = 'Maximize Screen Mirror Dialog';
@@ -2192,6 +2214,7 @@ if (btnCloseMirrorModal) {
 
 if (btnMaximizeMirrorModal) {
   btnMaximizeMirrorModal.addEventListener('click', () => {
+    if (!modalScreenMirror) return;
     const isMaximized = modalScreenMirror.classList.toggle('modal-maximized');
     btnMaximizeMirrorModal.innerHTML = isMaximized ? '🗗 Restore' : '🗖 Maximize';
     btnMaximizeMirrorModal.title = isMaximized ? 'Restore Screen Mirror Dialog' : 'Maximize Screen Mirror Dialog';
