@@ -2127,9 +2127,10 @@ document.addEventListener('click', async (e) => {
 });
 
 // Built-in Screen Mirroring & Fallback Stream
-// Built-in Screen Mirroring & Fallback Stream
 let mirrorStreamTimer = null;
 let mirrorStreamActive = false;
+let mirrorConsecFails = 0;
+const MIRROR_MAX_FAILS = 5;
 
 const modalScreenMirror = document.getElementById('modal-screen-mirror');
 const lblMirrorDeviceName = document.getElementById('lbl-mirror-device-name');
@@ -2150,51 +2151,101 @@ async function ensureSelectedDevice() {
   return state.selectedDevice;
 }
 
+function setMirrorOverlayState(msg, isError = false) {
+  const wrapper = document.querySelector('.mirror-canvas-wrapper');
+  if (!wrapper) return;
+  let overlay = wrapper.querySelector('.mirror-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.className = 'mirror-overlay';
+    overlay.style.cssText = `
+      position:absolute; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:10px;
+      font-size:13px; border-radius:8px; z-index:10;
+      background: rgba(5,8,17,0.85); color: #9ca3af;
+    `;
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(overlay);
+  }
+  if (msg === null) {
+    overlay.style.display = 'none';
+    return;
+  }
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `
+    <span style="font-size:28px">${isError ? '📵' : '📡'}</span>
+    <span style="color:${isError ? '#f87171' : '#9ca3af'};text-align:center;padding:0 20px;">${msg}</span>
+    ${isError ? `<button onclick="openBuiltinMirror()" style="margin-top:8px;padding:6px 16px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;cursor:pointer;font-size:12px;">↺ Retry</button>` : ''}
+  `;
+}
+
 async function openBuiltinMirror() {
   const target = await ensureSelectedDevice();
-  if (!target) return showToast('No attached Android device found! Connect a phone via USB or Wi-Fi first.', 'error');
+  if (!target) {
+    return showToast('No Android device connected! Connect via USB or Wi-Fi first.', 'error');
+  }
   if (lblMirrorDeviceName) lblMirrorDeviceName.innerText = `Target: ${target}`;
   if (modalScreenMirror) modalScreenMirror.classList.remove('hidden');
+  mirrorConsecFails = 0;
+  setMirrorOverlayState('Connecting to device...', false);
   startMirrorStream();
   logActivity('Opened Built-in Live Mirror', target, 'mirror');
 }
 
 async function openScreenMirroring() {
   const target = await ensureSelectedDevice();
-  if (!target) return showToast('No attached Android device found! Connect a phone via USB or Wi-Fi first.', 'error');
+  if (!target) return showToast('No Android device connected! Connect via USB or Wi-Fi first.', 'error');
 
-  showToast('Attempting to launch scrcpy...', 'info');
+  showToast('Attempting to launch native scrcpy...', 'info');
   const scrcpyRes = await callBridge('launch_scrcpy', target);
   if (scrcpyRes && scrcpyRes.success) {
     showToast(scrcpyRes.message, 'success');
     logActivity('Launched Native scrcpy Screen Mirror', target, 'mirror');
   } else {
-    // Fall back to built-in live screenshot stream modal
-    const msg = (scrcpyRes && scrcpyRes.message) ? scrcpyRes.message : 'scrcpy not found. Opening built-in Live Screen Mirror...';
-    showToast(msg, 'info');
+    const msg = (scrcpyRes && scrcpyRes.message) ? scrcpyRes.message : 'scrcpy not found.';
+    showToast(`${msg} Opening built-in Live Mirror instead...`, 'info');
     openBuiltinMirror();
   }
 }
 
 function startMirrorStream() {
   mirrorStreamActive = true;
+  mirrorConsecFails = 0;
   if (btnToggleMirrorStream) btnToggleMirrorStream.innerText = 'Pause Stream';
-  fetchMirrorFrame();
   if (mirrorStreamTimer) clearInterval(mirrorStreamTimer);
-  mirrorStreamTimer = setInterval(fetchMirrorFrame, 400);
+  fetchMirrorFrame();
+  mirrorStreamTimer = setInterval(fetchMirrorFrame, 500);
 }
 
 function stopMirrorStream() {
   mirrorStreamActive = false;
   if (btnToggleMirrorStream) btnToggleMirrorStream.innerText = 'Resume Stream';
-  if (mirrorStreamTimer) clearInterval(mirrorStreamTimer);
+  if (mirrorStreamTimer) { clearInterval(mirrorStreamTimer); mirrorStreamTimer = null; }
 }
 
 async function fetchMirrorFrame() {
-  if (!state.selectedDevice || !mirrorStreamActive) return;
-  const res = await callBridge('take_screenshot_silent', state.selectedDevice);
-  if (res && res.success && mirrorStreamImg) {
+  if (!mirrorStreamActive) return;
+  const target = state.selectedDevice;
+  if (!target) {
+    stopMirrorStream();
+    setMirrorOverlayState('No device selected.', true);
+    return;
+  }
+  const res = await callBridge('take_screenshot_silent', target);
+  if (res && res.success && res.image_data && mirrorStreamImg) {
     mirrorStreamImg.src = res.image_data;
+    mirrorConsecFails = 0;
+    setMirrorOverlayState(null); // hide overlay on first success
+  } else {
+    mirrorConsecFails++;
+    const errMsg = (res && res.error) ? res.error : 'ADB screenshot failed.';
+    if (mirrorConsecFails >= MIRROR_MAX_FAILS) {
+      stopMirrorStream();
+      setMirrorOverlayState(`Stream stopped: ${errMsg}\n\nMake sure your device is unlocked and USB debugging is enabled.`, true);
+      showToast(`Live Mirror stopped: ${errMsg}`, 'error');
+    } else {
+      setMirrorOverlayState(`Waiting for device frame... (${mirrorConsecFails}/${MIRROR_MAX_FAILS})`, false);
+    }
   }
 }
 

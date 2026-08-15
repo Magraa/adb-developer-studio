@@ -93,8 +93,11 @@ class ADBStudioAPI:
 
     def take_screenshot_silent(self, target):
         """Returns base64 screenshot without saving to disk - for live mirror stream use."""
-        success, b64_or_err = self.adb.take_screenshot_silent(target)
-        return {"success": success, "image_data": b64_or_err if success else "", "error": "" if success else b64_or_err}
+        try:
+            success, b64_or_err = self.adb.take_screenshot_silent(target)
+            return {"success": success, "image_data": b64_or_err if success else "", "error": "" if success else b64_or_err}
+        except Exception as e:
+            return {"success": False, "image_data": "", "error": str(e)}
 
     def get_recent_captures(self):
         save_dir = self.storage.get_screenshot_dir()
@@ -268,8 +271,11 @@ class ADBStudioAPI:
         return {"success": success, "message": message}
 
     def launch_scrcpy(self, target):
-        success, message = self.adb.launch_scrcpy(target)
-        return {"success": success, "message": message}
+        try:
+            success, message = self.adb.launch_scrcpy(target)
+            return {"success": success, "message": message}
+        except Exception as e:
+            return {"success": False, "message": f"Bridge error: {e}"}
 
     # --- Device File Explorer ---
     def list_files(self, target, remote_path="/sdcard/Download"):
