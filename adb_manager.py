@@ -137,17 +137,52 @@ class ADBManager:
         success, stdout, stderr = self._run_cmd(["disconnect", target])
         return success, stdout or stderr
 
+    def _ensure_device_online(self, target, retries=2):
+        """Check if target device is 'device' (ready). If offline, attempt reconnect.
+        Returns True if device is online after checks, False otherwise."""
+        for attempt in range(retries + 1):
+            ok, stdout, _ = self._run_cmd(["devices"], timeout=8)
+            if ok:
+                for line in stdout.splitlines():
+                    parts = line.strip().split()
+                    if len(parts) >= 2 and parts[0] == target:
+                        status = parts[1]
+                        if status == "device":
+                            return True  # online & ready
+                        elif status in ("offline", "unauthorized"):
+                            # Try reconnect for wireless targets
+                            if ":" in target and attempt < retries:
+                                self._run_cmd(["disconnect", target], timeout=5)
+                                time.sleep(0.5)
+                                self._run_cmd(["connect", target], timeout=8)
+                                time.sleep(1.0)
+                                continue
+                            return False
+            # device not in list at all — try reconnect if wireless
+            if ":" in target and attempt < retries:
+                self._run_cmd(["connect", target], timeout=8)
+                time.sleep(1.0)
+        return False
+
     def _screencap_bytes(self, target, timeout=15):
         """Captures screen bytes via a reliable pull-based method.
-        Works on USB and wireless ADB, avoids Windows CRLF corruption in exec-out."""
+        Works on USB and wireless ADB. Auto-reconnects offline wireless devices."""
         import tempfile, uuid
-        remote_tmp = f"/sdcard/.adbstudio_cap_{uuid.uuid4().hex[:8]}.png"
+
+        # Auto-heal offline / stale wireless connection before attempting capture
+        if not self._ensure_device_online(target):
+            return False, b"", f"Device '{target}' is offline or not authorized. Try reconnecting."
+
         target_args = ["-s", target] if target else []
+        remote_tmp = f"/sdcard/.adbstudio_cap_{uuid.uuid4().hex[:8]}.png"
 
         # Step 1: capture to device temp file
         ok, _, err = self._run_cmd(target_args + ["shell", "screencap", "-p", remote_tmp], timeout=timeout)
         if not ok:
-            # Clean up just in case
+            combined = err.lower()
+            # If still offline after reconnect attempt, surface a clear message
+            if "offline" in combined or "unauthorized" in combined:
+                return False, b"", "Device went offline. Please reconnect your phone in ADB settings."
             self._run_cmd(target_args + ["shell", "rm", "-f", remote_tmp], timeout=5)
             return False, b"", f"screencap failed: {err}"
 
@@ -170,6 +205,7 @@ class ADBManager:
             return True, image_bytes, ""
         except Exception as e:
             return False, b"", str(e)
+
 
     def take_screenshot(self, target, save_dir):
         """Takes screenshot, saves PNG, and returns base64 & file path.
@@ -194,12 +230,55 @@ class ADBManager:
 
     def take_screenshot_silent(self, target):
         """Takes screenshot to memory only (no file saved) for live mirror stream.
-        Uses pull-based capture: works on USB and wireless ADB connections."""
-        success, image_bytes, err = self._screencap_bytes(target, timeout=15)
-        if not success:
-            return False, err  # return actual error so JS overlay shows it
-        b64_str = "data:image/png;base64," + base64.b64encode(image_bytes).decode("utf-8")
-        return True, b64_str
+        Hot path: skips device-status pre-check for performance. Auto-reconnects inline on offline error."""
+        import tempfile, uuid
+
+        target_args = ["-s", target] if target else []
+        remote_tmp = f"/sdcard/.adbstudio_cap_{uuid.uuid4().hex[:8]}.png"
+
+        # Step 1: screencap to device storage
+        ok, _, err = self._run_cmd(target_args + ["shell", "screencap", "-p", remote_tmp], timeout=12)
+        if not ok:
+            err_lower = err.lower()
+            if "offline" in err_lower or "unauthorized" in err_lower:
+                # One auto-reconnect attempt for wireless targets
+                if ":" in target:
+                    self._run_cmd(["disconnect", target], timeout=4)
+                    time.sleep(0.4)
+                    rok, rout, _ = self._run_cmd(["connect", target], timeout=8)
+                    if rok and ("connected" in rout.lower() or "already" in rout.lower()):
+                        time.sleep(0.8)
+                        # Retry screencap after reconnect
+                        ok, _, err = self._run_cmd(target_args + ["shell", "screencap", "-p", remote_tmp], timeout=12)
+                        if not ok:
+                            return False, f"Reconnected but screencap still failed: {err}"
+                    else:
+                        return False, "Device offline — auto-reconnect failed. Re-pair in ADB settings."
+                else:
+                    return False, "USB device offline. Unplug and reconnect the cable."
+            else:
+                return False, f"screencap failed: {err}"
+
+        # Step 2: pull PNG to local temp
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                local_tmp = tmp.name
+            ok2, _, err2 = self._run_cmd(target_args + ["pull", remote_tmp, local_tmp], timeout=12)
+            self._run_cmd(target_args + ["shell", "rm", "-f", remote_tmp], timeout=4)
+            if not ok2:
+                return False, f"adb pull failed: {err2}"
+            with open(local_tmp, "rb") as f:
+                image_bytes = f.read()
+            try:
+                os.remove(local_tmp)
+            except Exception:
+                pass
+            if not image_bytes or not image_bytes.startswith(b"\x89PNG"):
+                return False, "Invalid PNG received from device"
+            b64_str = "data:image/png;base64," + base64.b64encode(image_bytes).decode("utf-8")
+            return True, b64_str
+        except Exception as e:
+            return False, str(e)
 
     def get_recent_captures(self, save_dir, limit=6):
         """Returns recent screenshot thumbnails, sizes, and timestamps from save_dir."""

@@ -2214,7 +2214,7 @@ function startMirrorStream() {
   if (btnToggleMirrorStream) btnToggleMirrorStream.innerText = 'Pause Stream';
   if (mirrorStreamTimer) clearInterval(mirrorStreamTimer);
   fetchMirrorFrame();
-  mirrorStreamTimer = setInterval(fetchMirrorFrame, 500);
+  mirrorStreamTimer = setInterval(fetchMirrorFrame, 1500);
 }
 
 function stopMirrorStream() {
